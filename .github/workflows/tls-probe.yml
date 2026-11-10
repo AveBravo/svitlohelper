@@ -1,0 +1,21 @@
+name: Test Marstek HTTPS (no secrets)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Test HTTPS request to Marstek without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          result=$(curl --silent --show-error --location --max-time 15 --output /dev/null --write-out '%{http_code}' \
+            'https://eu.hamedata.com/app/Solar/v2_get_device.php')
+          echo "Marstek unauthenticated HTTP: $result"
+          if [[ "$result" == "000" || "$result" == "525" ]]; then
+            echo 'GitHub runner cannot reach Marstek reliably.' >&2
+            exit 1
+          fi
