@@ -171,6 +171,14 @@ def main():
     except ValueError:
         raise RuntimeError('config: invalid_password_hash') from None
     status = collect(email, md5)
+    
+    reported = status.get("device_updated_at_epoch")
+    age = (
+        round((time.time() - reported) / 60)
+        if reported is not None else "unknown"
+    )
+    print(f"Marstek report age: {age} min")
+
     send_status(status, key)
     print('Marstek: snapshot accepted by Cloudflare; battery data available (values withheld).')
 
