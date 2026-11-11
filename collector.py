@@ -187,7 +187,14 @@ def main():
         int(md5, 16)
     except ValueError:
         raise RuntimeError('config: invalid_password_hash') from None
-    status = collect(email, md5)
+    status = collect(email, md5)    
+    print(
+        f"Cloud: SOC={status['soc']}%, "
+        f"charge={status['charge_power_w']} W, "
+        f"discharge={status['discharge_power_w']} W, "
+        f"load={status['load_power_w']} W"
+    )
+
     
     reported = status.get("device_updated_at_epoch")
     age = (
