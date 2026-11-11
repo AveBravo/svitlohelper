@@ -116,6 +116,23 @@ def collect(email, pwd_md5):
     reading_list = [r for r in find_readings(devices) if str(r.get('model', '')).upper() != 'HME-3']
     if not reading_list:
         raise RuntimeError('marstek: readings_missing')
+        
+    print(f"Marstek: знайдено записів: {len(reading_list)}")
+
+    for i, device in enumerate(reading_list, 1):
+        timestamp = parse_report_time(device.get("report_time"))
+        age = (
+            round((time.time() - timestamp) / 60)
+            if timestamp is not None else "невідомо"
+        )
+        print(
+            f"Запис #{i}: "
+            f"SOC={device.get('soc')}%, "
+            f"charge={device.get('charge')} W, "
+            f"discharge={device.get('discharge')} W, "
+            f"вік={age} хв"
+        )
+
     r = reading_list[0]
     soc = valid_number(r.get('soc'))
     charge = valid_number(r.get('charge'))
