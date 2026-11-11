@@ -134,6 +134,21 @@ def collect(email, pwd_md5):
         )
 
     r = reading_list[0]
+    
+    # Діагностика доступних показників потужності
+    hints = (
+        "soc", "power", "load", "charge",
+        "discharge", "offgrid", "ongrid",
+        "ups", "backup"
+    )
+
+    for name, value in sorted(r.items()):
+        if any(hint in name.lower() for hint in hints):
+            if type(value) in (int, float):
+                print(f"Cloud field: {name}={value}")
+            else:
+                print(f"Cloud field: {name} (non-numeric)")
+
     soc = valid_number(r.get('soc'))
     charge = valid_number(r.get('charge'))
     discharge = valid_number(r.get('discharge'))
