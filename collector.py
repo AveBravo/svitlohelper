@@ -154,63 +154,77 @@ def find_readings(value, depth=0):
 
 
 def print_payload_summary(payload):
-    """Log structure and counts only, never raw response values."""
-    counts = {
-        "objects": 0,
-        "soc_fields": 0,
-        "valid_soc": 0,
-        "charge_fields": 0,
-        "discharge_fields": 0,
-        "complete_readings": 0,
-        "hme3_readings": 0,
-    }
+    """Log only known field types, counts and numeric API codes."""
+    log(f"Marstek response: type={type(payload).__name__}")
 
-    def walk(value, depth=0):
-        if depth > 10:
-            return
+    if not isinstance(payload, dict):
+        if isinstance(payload, list):
+            log(f"Marstek response: list_length={len(payload)}")
+        return
 
-        if isinstance(value, dict):
-            counts["objects"] += 1
-            fields = {
-                str(key).lower(): child
-                for key, child in value.items()
-            }
-
-            for field in ("soc", "charge", "discharge"):
-                if field in fields:
-                    counts[field + "_fields"] += 1
-
-            soc = valid_number(fields.get("soc"))
-            if soc is not None and 0 <= soc <= 100:
-                counts["valid_soc"] += 1
-
-                if "charge" in fields or "discharge" in fields:
-                    counts["complete_readings"] += 1
-
-                    if (
-                        str(fields.get("model", "")).upper()
-                        == "HME-3"
-                    ):
-                        counts["hme3_readings"] += 1
-
-            for child in value.values():
-                walk(child, depth + 1)
-
-        elif isinstance(value, list):
-            for child in value:
-                walk(child, depth + 1)
-
-    walk(payload)
-
-    summary = "; ".join(
-        f"{name}={count}" for name, count in counts.items()
-    )
-    log(
-        f"Marstek response: type={type(payload).__name__}; "
-        + summary
+    # Fixed field names only. Never print raw response values.
+    known_fields = (
+        "code", "errno", "error", "status",
+        "success", "ok", "msg", "message",
+        "data", "result", "devices", "list",
     )
 
+    for name in known_fields:
+        if name not in payload:
+            continue
 
+        value = payload[name]
+        detail = f"type={type(value).__name__}"
+
+        if isinstance(value, (dict, list)):
+            detail += f"; count={len(value)}"
+
+        elif name in ("code", "errno", "status", "error"):
+            number = valid_number(value)
+            if number is not None and abs(number) <= 100000:
+                detail += f"; numeric_code={number:g}"
+
+        elif name in ("success", "ok"):
+            if isinstance(value, bool):
+                detail += f"; value={value}"
+
+        log(f"Marstek field {name}: {detail}")
+
+    # Classify messages without exposing their text.
+    for name in ("msg", "message", "error"):
+        value = payload.get(name)
+        if not isinstance(value, str):
+            continue
+
+        text = value.lower()
+        categories = {
+            "authentication": (
+                "token", "login", "unauthorized", "authentication",
+            ),
+            "permission": (
+                "permission", "forbidden", "access denied",
+            ),
+            "rate_limit": (
+                "too many", "rate limit", "frequent",
+            ),
+            "server": (
+                "maintenance", "server error", "unavailable",
+            ),
+        }
+
+        matches = [
+            category
+            for category, words in categories.items()
+            if any(word in text for word in words)
+        ]
+
+        log(
+            f"Marstek message {name}: category="
+            + (",".join(matches) if matches else "unclassified")
+        )
+
+    readings = find_readings(payload)
+    log(f"Marstek response: matching_readings={len(readings)}")
 def parse_report_time(raw):
     """Trust only positive epochs or dates with explicit timezone."""
     if isinstance(raw, bool):
@@ -245,8 +259,7 @@ def parse_report_time(raw):
         return seconds if seconds > 0 else None
     except (ValueError, OverflowError, OSError):
         return None
-
-
+        
 def collect_once(email, pwd_md5):
     login = fetch_json(
         "POST",
